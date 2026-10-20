@@ -1,0 +1,1179 @@
+<!doctype html>
+<html lang="nb">
+<meta charset="utf-8">
+<meta name="robots" content="noindex, nofollow">
+<title>Controllerstøtte PoC</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: arbeidsflate i én kolonne (maks 1240px). Oppsummering først, detaljer under. Brede tabeller ruller i egne beholdere. */
+:root {
+  --papir: #f3f5f2; --flate: #ffffff; --flate-2: #edf1ed; --blekk: #17201b; --dempet: #55615a; --linje: #d7dfd9; --kant: #76837c;
+  --aksent: #1c5a46; --aksent-svak: #e0ece6; --aksent-blekk: #ffffff;
+  --hoy: #b42318; --hoy-svak: #fbe8e6; --middels: #8f5300; --middels-svak: #fcf0da; --info: #4a5851; --info-svak: #eaeeec;
+  --ok: #1b7340; --ok-svak: #e1f2e7; --fokus: #2463b0;
+  --f-visning: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-tekst: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-data: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --papir: #0e1411; --flate: #151c18; --flate-2: #1b241f; --blekk: #e3eae5; --dempet: #9ba9a1; --linje: #2a352f; --kant: #72817a;
+    --aksent: #6cc29f; --aksent-svak: #1b3127; --aksent-blekk: #0b120e;
+    --hoy: #ff9086; --hoy-svak: #3a1c19; --middels: #f0b450; --middels-svak: #352914; --info: #aab7af; --info-svak: #212a25;
+    --ok: #6cd296; --ok-svak: #16301f; --fokus: #8bb5f7; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --papir: #0e1411; --flate: #151c18; --flate-2: #1b241f; --blekk: #e3eae5; --dempet: #9ba9a1; --linje: #2a352f; --kant: #72817a;
+  --aksent: #6cc29f; --aksent-svak: #1b3127; --aksent-blekk: #0b120e;
+  --hoy: #ff9086; --hoy-svak: #3a1c19; --middels: #f0b450; --middels-svak: #352914; --info: #aab7af; --info-svak: #212a25;
+  --ok: #6cd296; --ok-svak: #16301f; --fokus: #8bb5f7; color-scheme: dark;
+}
+html { scroll-padding-top: 64px; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--papir); color: var(--blekk); font: 15px/1.5 var(--f-tekst); }
+.ramme { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--f-visning); font-weight: 600; letter-spacing: .005em; text-wrap: balance; margin: 0; }
+h1 { font-size: 1.75rem; line-height: 1.15; }
+h2 { font-size: 1.3rem; }
+h3 { font-size: 1.08rem; }
+p { margin: 0; max-width: 72ch; }
+a { color: var(--aksent); }
+:focus-visible { outline: 2px solid var(--fokus); outline-offset: 2px; border-radius: 3px; }
+.dempet { color: var(--dempet); }
+.liten-tekst { font-size: .84rem; }
+.mono { font-family: var(--f-data); font-size: .82rem; }
+.tall { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.skjult-for-skjerm { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Topp */
+.topp { border-bottom: 1px solid var(--linje); background: var(--flate); }
+.topp .ramme { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; padding-block: 18px 14px; }
+.merke { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.over { font: 600 .74rem/1.2 var(--f-tekst); letter-spacing: .09em; text-transform: uppercase; color: var(--dempet); }
+.prinsipp { font-size: .92rem; color: var(--dempet); }
+.prinsipp b { color: var(--blekk); font-weight: 600; }
+.brikker { display: flex; flex-wrap: wrap; gap: 6px; }
+.brikke { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--linje); background: var(--flate-2); border-radius: 999px; padding: 3px 10px; font-size: .8rem; color: var(--dempet); }
+.brikke i { width: 7px; height: 7px; border-radius: 50%; background: var(--aksent); display: inline-block; }
+
+/* Faner */
+.faner { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--papir); border-bottom: 1px solid var(--linje); }
+.faner .ramme { position: relative; display: flex; gap: 2px; overflow-x: auto; }
+.fane { position: relative; appearance: none; border: 0; background: none; color: var(--dempet); font: 600 .95rem var(--f-tekst); padding: 12px 14px 10px; border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
+.fane[aria-selected="true"] { color: var(--blekk); border-bottom-color: var(--aksent); }
+.fane .teller { display: inline-block; font: 500 .75rem var(--f-data); color: var(--dempet); margin-left: 6px; }
+main { padding-block: 20px 56px; }
+section.panel { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
+
+/* Flater */
+.kort { background: var(--flate); border: 1px solid var(--linje); border-radius: 8px; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
+.kort h2, .kort h3, .kort p { overflow-wrap: anywhere; }
+.kort-hode { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; }
+.rad { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rutenett-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 18px; }
+
+/* Steg */
+.steg { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: 8px; }
+.steg li { border: 1px solid var(--linje); background: var(--flate); border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; }
+.steg .nr { font: 600 .72rem var(--f-data); color: var(--dempet); letter-spacing: .06em; }
+.steg .tittel { font-weight: 600; }
+.steg .status { font-size: .84rem; color: var(--dempet); }
+.steg li.ferdig { border-color: var(--ok); }
+.steg li.ferdig .status { color: var(--ok); }
+.steg li.aktiv { border-color: var(--aksent); box-shadow: inset 0 0 0 1px var(--aksent); }
+
+/* Nøkkeltall */
+.tallrekke { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr)); gap: 1px; background: var(--linje); border: 1px solid var(--linje); border-radius: 8px; overflow: hidden; margin: 0; }
+.tallrekke div { background: var(--flate); padding: 10px 14px; display: grid; gap: 2px; min-width: 0; }
+.tallrekke dt { font-size: .76rem; text-transform: uppercase; letter-spacing: .07em; color: var(--dempet); }
+.tallrekke dd { margin: 0; font: 600 1.25rem var(--f-visning); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* Filer */
+.filer { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: 10px; }
+.fil { border: 1px solid var(--linje); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; background: var(--flate); min-width: 0; }
+.fil .navn { font: 500 .84rem var(--f-data); overflow-wrap: anywhere; }
+.fil dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: .84rem; }
+.fil dt { color: var(--dempet); }
+.fil dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+/* Knapper */
+.knapp { appearance: none; border: 1px solid var(--aksent); background: var(--aksent); color: var(--aksent-blekk); font: 600 .9rem var(--f-tekst); padding: 8px 14px; border-radius: 6px; cursor: pointer; }
+.knapp:hover { filter: brightness(1.06); }
+.knapp.sekundaer { background: transparent; color: var(--aksent); }
+.knapp.liten { padding: 4px 10px; font-size: .82rem; }
+.knapp.godta { background: var(--ok); border-color: var(--ok); color: var(--flate); }
+.knapp.utelat { background: transparent; border-color: var(--hoy); color: var(--hoy); }
+.knapp:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+.lenkeknapp { appearance: none; border: 0; background: none; padding: 0; color: var(--aksent); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.kildeknapp { appearance: none; border: 0; background: none; padding: 0; cursor: pointer; color: var(--dempet); font: .76rem/1.4 var(--f-data); text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.kildeknapp:hover { color: var(--aksent); }
+
+/* Merker for alvor og status */
+.pille { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 1px 8px; font: 600 .72rem/1.6 var(--f-tekst); letter-spacing: .03em; white-space: nowrap; }
+.pille.høy { background: var(--hoy-svak); color: var(--hoy); }
+.pille.middels { background: var(--middels-svak); color: var(--middels); }
+.pille.info { background: var(--info-svak); color: var(--info); }
+.pille.ok { background: var(--ok-svak); color: var(--ok); }
+.pille.ny { background: var(--aksent-svak); color: var(--aksent); }
+.status { display: inline-flex; align-items: center; gap: 6px; border-radius: 5px; padding: 2px 8px; font-size: .8rem; font-weight: 600; border: 1px solid var(--kant); color: var(--dempet); }
+.status.s-godtatt { background: var(--ok); border-color: var(--ok); color: var(--flate); }
+.status.s-endret { background: var(--middels); border-color: var(--middels); color: var(--flate); }
+.status.s-utelatt { background: var(--hoy); border-color: var(--hoy); color: var(--flate); }
+.flagg { display: grid; grid-template-columns: auto 1fr; gap: 6px; align-items: start; font-size: .84rem; }
+.flaggliste { display: grid; gap: 6px; }
+
+/* Avviksliste */
+.avvik { list-style: none; margin: 0; padding: 0; display: grid; }
+.avvik li { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px solid var(--linje); }
+.avvik li:first-child { border-top: 0; }
+.avvik .hva { overflow-wrap: anywhere; }
+.avvik .hva b { font-weight: 600; }
+.kvittering { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.kvittering input[type="text"] { flex: 1 1 14rem; }
+@media (max-width: 640px) { .avvik li { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+
+/* Tabeller */
+.rull { position: relative; overflow-x: auto; border: 1px solid var(--linje); border-radius: 8px; background: var(--flate); }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid var(--linje); font-size: .88rem; }
+th { font: 600 .72rem var(--f-tekst); text-transform: uppercase; letter-spacing: .07em; color: var(--dempet); background: var(--flate-2); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.h, th.h { text-align: right; }
+tr.utenfor td { background: var(--flate-2); }
+tr.vurdert td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
+tr.avvist td:first-child { box-shadow: inset 3px 0 0 var(--hoy); }
+tr:focus { outline: 2px solid var(--fokus); outline-offset: -2px; }
+tr.blink td { animation: blink 1.6s ease-out 1; }
+@keyframes blink { from { background: var(--aksent-svak); } to { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { tr.blink td { animation: none; background: var(--aksent-svak); } }
+.etikett { font-weight: 600; }
+select, input[type="text"] { font: inherit; font-size: .86rem; color: var(--blekk); background: var(--flate); border: 1px solid var(--kant); border-radius: 5px; padding: 4px 6px; max-width: 100%; }
+.feilmelding { color: var(--hoy); font-size: .82rem; }
+.regelkilde { font-size: .78rem; color: var(--dempet); }
+.forslag { display: grid; gap: 6px; min-width: 17rem; font-size: .86rem; }
+.forslag-topp { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.forslag-topp select { width: 13.5rem; }
+.beslutning { display: grid; gap: 6px; min-width: 14.5rem; }
+.handlinger { display: flex; flex-wrap: wrap; gap: 6px; }
+.hint { font-size: .78rem; color: var(--dempet); }
+
+/* Konfidens */
+.konf { display: grid; gap: 4px; min-width: 56px; }
+.konf b { font: 600 .9rem var(--f-data); }
+.maaler { height: 5px; background: var(--flate-2); border-radius: 3px; overflow: hidden; }
+.maaler span { display: block; height: 100%; width: calc(var(--v) * 100%); background: var(--ok); }
+.k-mid .maaler span { background: var(--aksent); }
+.k-lav .maaler span { background: var(--middels); }
+.k-lav b { color: var(--middels); }
+
+/* Månedsfordeling */
+.mnd { display: grid; grid-template-columns: repeat(12, 7px); gap: 2px; align-items: end; height: 28px; margin-top: 6px; }
+.mnd span { background: var(--aksent); opacity: .6; border-radius: 1px; min-height: 1px; }
+.mnd span.hopp { background: var(--middels); opacity: 1; }
+
+/* Avstemming */
+.stabel { display: flex; height: 14px; border-radius: 4px; overflow: hidden; background: var(--flate-2); }
+.stabel span { display: block; height: 100%; }
+.s-godkjent { background: var(--ok); } .s-avvist { background: var(--hoy); } .s-utenfor { background: var(--info); } .s-ikke { background: var(--linje); }
+.forklaring { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .82rem; color: var(--dempet); }
+.forklaring i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.likning { font-size: .92rem; }
+.likning .ok { color: var(--ok); font-weight: 600; }
+.likning .feil { color: var(--hoy); font-weight: 600; }
+
+/* Bekreft / eksport */
+.bekreft { border: 1px solid var(--aksent); background: var(--aksent-svak); border-radius: 8px; padding: 14px; display: grid; gap: 10px; }
+.mangler { margin: 0; padding-left: 18px; color: var(--dempet); font-size: .88rem; }
+pre.csv { margin: 0; padding: 12px; font: .76rem/1.55 var(--f-data); white-space: pre; overflow: auto; max-height: 340px; background: var(--flate-2); border-radius: 6px; }
+.hash { font: .78rem var(--f-data); overflow-wrap: anywhere; }
+textarea.kopi { width: 100%; height: 120px; font: .76rem var(--f-data); }
+
+/* Kildevindu */
+dialog { border: 1px solid var(--linje); border-radius: 10px; padding: 0; background: var(--flate); color: var(--blekk); width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 48px); }
+dialog::backdrop { background: rgba(10, 16, 13, .45); }
+.vindu { display: grid; gap: 12px; padding: 16px; }
+.ark { position: relative; overflow: auto; max-height: 60vh; border: 1px solid var(--linje); border-radius: 6px; }
+.ark table { width: auto; }
+.ark th, .ark td { font: .78rem/1.3 var(--f-data); padding: 5px 8px; border: 1px solid var(--linje); white-space: nowrap; text-transform: none; letter-spacing: 0; }
+.ark th { background: var(--flate-2); color: var(--dempet); text-align: center; }
+.ark td.hl { background: var(--aksent-svak); box-shadow: inset 0 0 0 2px var(--aksent); }
+.ark td.hl-etikett { background: var(--flate-2); font-weight: 600; }
+.ark td.hl-sum { background: var(--hoy-svak); box-shadow: inset 0 0 0 2px var(--hoy); }
+.filfaner { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Kontering */
+details.hvorfor summary { cursor: pointer; color: var(--aksent); font-size: .84rem; }
+.belegg { display: grid; gap: 8px; margin-top: 8px; }
+.kand { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 8px; background: var(--flate-2); border-radius: 6px; }
+.kand ul { margin: 0; padding-left: 18px; font-size: .82rem; }
+.deler { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--linje); max-width: 240px; }
+.d-lev { background: var(--aksent); } .d-regel { background: var(--middels); } .d-likhet { background: var(--info); }
+
+/* Logg */
+.logghode { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.kjede { font-weight: 600; }
+.kjede.ok { color: var(--ok); } .kjede.brudd { color: var(--hoy); }
+tr.brudd td { background: var(--hoy-svak); }
+
+/* Om */
+.prosa { display: grid; gap: 10px; }
+.prosa ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; max-width: 80ch; }
+pre.mermaid { background: var(--flate); border: 1px solid var(--linje); border-radius: 8px; padding: 14px; overflow-x: auto; margin: 0; }
+
+.melding { border-radius: 6px; padding: 8px 12px; font-size: .88rem; }
+.melding.feil { background: var(--hoy-svak); color: var(--hoy); }
+.melding.ok { background: var(--ok-svak); color: var(--ok); }
+</style>
+
+<header class="topp">
+  <div class="ramme">
+    <div class="merke">
+      <span class="over">NLAT · proof of concept for økonomi</span>
+      <h1>Controllerstøtte</h1>
+      <p class="prinsipp">Systemet <b>foreslår, forklarer og begrunner</b>. Controlleren <b>godkjenner</b>. Ingenting skrives til Genus eller Eyeshare.</p>
+    </div>
+    <div class="brikker">
+      <span class="brikke"><i></i>Syntetiske data</span>
+      <span class="brikke">Regelbasert i demoen, åpen språkmodell i PoC-en</span>
+      <span class="brikke">Kjører i nettleseren</span>
+    </div>
+  </div>
+</header>
+
+<nav class="faner" aria-label="Deler av demoen">
+  <div class="ramme" role="tablist">
+    <button class="fane" role="tab" id="fane-budsjett" aria-controls="budsjett" aria-selected="true">Budsjettstøtte <span class="teller" id="teller-budsjett"></span></button>
+    <button class="fane" role="tab" id="fane-kontering" aria-controls="kontering" aria-selected="false">Konteringshjelp <span class="teller" id="teller-kontering"></span></button>
+    <button class="fane" role="tab" id="fane-logg" aria-controls="logg" aria-selected="false">Revisjonslogg <span class="teller" id="teller-logg"></span></button>
+    <button class="fane" role="tab" id="fane-om" aria-controls="om" aria-selected="false">Om løsningen</button>
+  </div>
+</nav>
+
+<main class="ramme">
+  <section class="panel" id="budsjett" role="tabpanel" aria-labelledby="fane-budsjett">
+    <div id="b-status"></div>
+    <div id="b-filer"></div>
+    <div id="b-avvik"></div>
+    <div id="b-tabeller" class="panel"></div>
+    <div id="b-avslutning"></div>
+    <input type="file" id="opplasting" accept=".xlsx" multiple hidden>
+  </section>
+  <section class="panel" id="kontering" role="tabpanel" aria-labelledby="fane-kontering" hidden>
+    <div id="k-intro"></div>
+    <div id="k-status"></div>
+    <div id="k-tabell"></div>
+    <div id="k-eval"></div>
+    <div id="k-loo"></div>
+  </section>
+  <section class="panel" id="logg" role="tabpanel" aria-labelledby="fane-logg" hidden></section>
+  <section class="panel" id="om" role="tabpanel" aria-labelledby="fane-om" hidden>
+    <div class="kort prosa">
+      <h2>Hva demoen viser</h2>
+      <p>Demoen viser to av de sju behovene økonomi har meldt inn: klargjøring av budsjettark for Genus (hovedsporet) og konteringsforslag for inngående fakturaer (et begrenset delspor). Alle tall, avdelinger, leverandører og bilag er oppdiktet.</p>
+      <ul>
+        <li><b>Kode regner, modellen tolker.</b> Summer, enheter, periodisering og avstemming gjøres i vanlig kode. I PoC-en skal en åpen språkmodell bare tolke tekst og velge blant kontoer som finnes i kontoplanen. Demoen bruker bare regler.</li>
+        <li><b>Hvert forslag har kilde og begrunnelse.</b> Klikk på en cellehenvisning for å se cellene forslaget bygger på.</li>
+        <li><b>Usikre forslag kan ikke godtas direkte.</b> Controlleren må velge konto selv i listen.</li>
+        <li><b>Kontroll mot kildearket.</b> Rader med beløp uten tekst, celler som ikke kan leses som beløp, avvik mot arkets egne summer, dupliserte periodekolonner og feil budsjettår flagges. Importen stoppes hvis noe ikke er lest.</li>
+        <li><b>Høy-avvik kvitteres med kommentar.</b> Sumavvik, avvik mot arkets totalsum, annet budsjettår, ukjent enhet og ukjent konto må kvitteres før importfilen lages. Inntektslinjer må enten bekreftes holdt utenfor eller tas med som kostnad.</li>
+        <li><b>Ingen persondata.</b> Opplastede ark skannes for fødselsnummer, e-postadresser og telefonnumre. Treff stopper innlesingen, og bare type og celle vises.</li>
+        <li><b>Ingen skrivetilgang.</b> Resultatet er en importfil som controlleren selv leser inn i Genus. Den lages først når alle linjer er vurdert.</li>
+        <li><b>Revisjonslogg.</b> Forslag med begrunnelse og flagg, filens SHA-256, hver beslutning og eksporten logges, og endringer i ettertid kan avdekkes.</li>
+        <li><b>Konfidens er en regelbasert poengsum,</b> ikke en sannsynlighet. Hvor godt poengsummen treffer, er noe PoC-en skal måle.</li>
+      </ul>
+    </div>
+    <div class="kort prosa">
+      <h2>Arkitektur i målbildet</h2>
+      <pre class="mermaid" aria-hidden="true">
+flowchart LR
+  A[Budsjettark xlsx] --> P[Parser i kode]
+  P --> R[Regler: summer, enheter, avvik]
+  P --> L[Åpen språkmodell: tolker tekst, velger blant kandidater]
+  K[(Kontoplan, regler, budsjettinstrukser)] --> L
+  R --> G[Controller vurderer hver linje]
+  L --> G
+  G --> E[Importfil med SHA-256]
+  E -->|manuell innlesing| GE[Genus]
+  G --> LOG[(Revisjonslogg)]
+      </pre>
+      <p>Flyten i tekst: budsjettarket leses av en parser i vanlig kode. Regler regner summer, enheter og avvik, og en åpen språkmodell tolker tekst og velger blant kontoer fra kontoplanen, budsjettinstruksene og konteringsreglene. Controlleren vurderer hver linje. Godkjente linjer blir en importfil med SHA-256, som controlleren leser inn i Genus. Alt logges.</p>
+      <p class="dempet">Modellen kjører lokalt eller hos en leverandør i Norge/EU, bak et OpenAI-kompatibelt grensesnitt slik at den kan byttes. Modellmiljøet har ikke tilgang til Genus eller Eyeshare.</p>
+    </div>
+    <div class="kort">
+      <h2>Demo, lokal PoC og målbilde</h2>
+      <div class="rull">
+        <table>
+          <thead><tr><th>Område</th><th>Denne demoen</th><th>Lokal PoC (Python)</th><th>Målbilde for pilot</th></tr></thead>
+          <tbody>
+            <tr><td>Modell</td><td>Forklarbare regler</td><td>Regler, valgfri åpen modell via API</td><td>Åpen modell lokalt eller hos norsk/EU-leverandør, valgt etter egen evaluering</td></tr>
+            <tr><td>Kunnskapsgrunnlag</td><td>Illustrativ kontoplan</td><td>Illustrativ kontoplan (csv)</td><td>NLAs kontoplan, konteringsregler og budsjettinstrukser med kildehenvisning</td></tr>
+            <tr><td>Data</td><td>Syntetiske</td><td>Syntetiske</td><td>Anonymiserte historiske ark og bilag</td></tr>
+            <tr><td>Integrasjon</td><td>Importfil vises og kopieres</td><td>Importfil lastes ned</td><td>Fil til Genus etter godkjenning; API først når filflyten er bevist</td></tr>
+            <tr><td>Logg</td><td>I nettleseren, forsvinner når siden lukkes</td><td>Fil med hash-kjede</td><td>Sentral, skrivebeskyttet logg med tilgangsstyring</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="dempet">Budsjettdelen bruker samme regler som den lokale Python-PoC-en. For de tre testarkene og over 200 kanttilfeller gir de identiske forslag, flagg og importfil. Opplastede filer leses bare i nettleseren og sendes ikke videre. Bruk kun syntetiske data.</p>
+    </div>
+  </section>
+</main>
+<div id="kunngjoring" class="skjult-for-skjerm" role="status" aria-live="polite"></div>
+
+<dialog id="kildevindu" aria-labelledby="kildetittel">
+  <div class="vindu">
+    <div class="kort-hode">
+      <h2 id="kildetittel">Kildeark</h2>
+      <button class="knapp sekundaer liten" id="lukk-kilde">Lukk</button>
+    </div>
+    <div class="filfaner" id="kildefaner"></div>
+    <p class="dempet" id="kildeinfo"></p>
+    <div class="ark" id="kildeark"></div>
+  </div>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script src="data.js" charset="utf-8"></script>
+<script src="motor.js" charset="utf-8"></script>
+<script>
+(function () {
+  'use strict';
+  document.documentElement.lang = 'nb';
+  var D = window.DemoData, M = window.Motor;
+  var motor = new M.Motor(D);
+  var T = motor.terskler; // fra data/konfig.json via data.js
+  var kont = new M.Kontering(D);
+  var KONF_GRENSE_KONTERING = 0.6;
+  var MND = ['jan', 'feb', 'mar', 'apr', 'mai', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'des'];
+
+  var esc = function (s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var komma = function (x) { return Number(x).toFixed(2).replace('.', ','); };
+  /** Motorens tekster bruker desimalpunktum (som Python-PoC-en); på skjermen vises desimalkomma. */
+  var vis = function (s) { return esc(String(s).replace(/(konfidens )(\d)\.(\d+)/g, '$1$2,$3').replace(/(\d)\.(\d+)(?= ?%)/g, '$1,$2')); };
+  var $ = function (id) { return document.getElementById(id); };
+  var flertall = function (n, en, flere) { return n + ' ' + (n === 1 ? en : flere); };
+
+  var state = {
+    fane: 'budsjett',
+    filer: D.budsjettfiler, kildeNavn: 'demo', run: null,
+    utkast: {}, kvUtkast: {}, kvFeil: {}, radFeil: {}, melding: null, bekreft: false, eksport: null, kopiFallback: false,
+    kilde: { fil: 0, linje: null },
+    k: { forslag: [], beslutninger: {}, utkast: {}, feil: {}, visFasit: false, loo: null },
+  };
+
+  // ---------- Revisjonslogg med hash-kjede ----------
+  function kanon(v) {
+    if (Array.isArray(v)) return '[' + v.map(kanon).join(',') + ']';
+    if (v && typeof v === 'object') return '{' + Object.keys(v).sort().map(function (k) { return JSON.stringify(k) + ':' + kanon(v[k]); }).join(',') + '}';
+    return JSON.stringify(v === undefined ? null : v);
+  }
+  var NULL = new Array(65).join('0');
+  var Logg = {
+    poster: [], ko: Promise.resolve(), status: null, manipulert: null,
+    skriv: function (hendelse, data) {
+      var self = this;
+      this.ko = this.ko.then(function () {
+        var prev = self.poster.length ? self.poster[self.poster.length - 1].hash : NULL;
+        var p = { seq: self.poster.length + 1, tid: new Date().toISOString().slice(0, 19) + 'Z', bruker: 'controller (demo)', hendelse: hendelse, data: data, prev: prev };
+        return M.sha256(kanon(p)).then(function (h) { p.hash = h; self.poster.push(p); self.status = null; if (state.fane === 'logg') renderLogg(); oppdaterTellere(); });
+      });
+      return this.ko;
+    },
+    verifiser: function () {
+      var self = this;
+      return this.ko.then(async function () {
+        var prev = NULL;
+        for (var i = 0; i < self.poster.length; i++) {
+          var p = self.poster[i], kopi = {};
+          Object.keys(p).forEach(function (k) { if (k !== 'hash') kopi[k] = p[k]; });
+          var h = await M.sha256(kanon(kopi));
+          if (p.prev !== prev || h !== p.hash) return { ok: false, seq: p.seq };
+          prev = p.hash;
+        }
+        return { ok: true };
+      });
+    },
+  };
+
+  // ---------- Felles visning ----------
+  function konfKlasse(k, grense) { return k >= 0.9 ? 'k-hoy' : (k >= grense ? 'k-mid' : 'k-lav'); }
+  function konfHtml(k, grense) {
+    return '<div class="konf ' + konfKlasse(k, grense) + '" title="Regelbasert poengsum, ikke en sannsynlighet"><b>' + komma(k) + '</b><div class="maaler" style="--v:' + Math.max(0, Math.min(1, k)) + '" aria-hidden="true"><span></span></div></div>';
+  }
+  function pille(alvor, tekst) { return '<span class="pille ' + esc(alvor) + '">' + esc(tekst || alvor) + '</span>'; }
+  function flaggHtml(fl, l) {
+    if (!fl.length) return '';
+    return '<div class="flaggliste">' + fl.map(function (f) {
+      var ekstra = f.kode === 'SUMAVVIK' && l ? ' Importen bruker summen av periodene (' + M.kr(l.total) + ' kr).' : '';
+      if (f.kode === 'AVDELING_UKJENT') ekstra = ' Skriv «Avdeling: KODE» i en celle over tabellen, eller ta med koden i filnavnet, og last opp arket på nytt.';
+      return '<div class="flagg">' + pille(f.alvor) + '<span>' + vis(f.tekst) + esc(ekstra) + '</span></div>';
+    }).join('') + '</div>';
+  }
+  function mndHtml(l) {
+    var verdier = []; for (var m = 1; m <= 12; m++) verdier.push(l.perioder[m] || 0);
+    var max = Math.max.apply(null, verdier) || 1;
+    var hoppMnd = [];
+    if (l.hopp_periode !== undefined) hoppMnd = l.orig_perioder.length === 4 ? [1, 2, 3].map(function (x) { return 3 * l.hopp_periode + x; }) : [l.hopp_periode + 1];
+    var etikett = 'Fordeling per måned: ' + verdier.map(function (v, i) { return MND[i] + ' ' + M.kr(v); }).join(', ');
+    return '<div class="mnd" role="img" aria-label="' + esc(etikett) + '">' + verdier.map(function (v, i) {
+      return '<span class="' + (hoppMnd.indexOf(i + 1) >= 0 ? 'hopp' : '') + '" style="height:' + Math.max(4, Math.round(v / max * 100)) + '%" title="' + MND[i] + ': ' + M.kr(v) + ' kr"></span>';
+    }).join('') + '</div>';
+  }
+  function medFokus(id) { var e = id && $(id); if (e && !e.disabled) { e.focus({ preventScroll: true }); return true; } return false; }
+  function kunngjor(tekst) { var k = $('kunngjoring'); k.textContent = ''; setTimeout(function () { k.textContent = tekst; }, 30); }
+
+  // ---------- Budsjett: tilstand ----------
+  function nyKjoring(filer, kildeNavn) {
+    state.filer = filer; state.kildeNavn = kildeNavn;
+    state.run = motor.analyser(filer, 2027);
+    state.utkast = {}; state.kvUtkast = {}; state.kvFeil = {}; state.radFeil = {}; state.bekreft = false; state.eksport = null; state.melding = null;
+    var linjer = M.alleLinjer(state.run);
+    Logg.skriv('analyse', {
+      kjoring: state.run.id, kilde: kildeNavn, versjon: state.run.versjon, antall_linjer: linjer.length,
+      filer: filer.map(function (f) { return { navn: f.navn, sha256: f.sha256 || null }; }),
+      arkflagg: state.run.ark.map(function (a) { return { fil: a.fil, ark: a.ark, flagg: a.flagg.map(function (f) { return f.kode; }) }; }),
+      forslag: linjer.map(function (l) { return { id: l.id, etikett: l.etikett, konto: l.konto, konf: l.konf, kilde: l.kilde, begrunnelse: l.begrunnelse, flagg: l.flagg.map(function (f) { return f.kode; }) }; }),
+    });
+  }
+  function arkFor(l) { return state.run.ark.find(function (a) { return a.linjer.indexOf(l) >= 0; }); }
+  function finnLinje(id) { return M.alleLinjer(state.run).find(function (l) { return l.id === id; }); }
+  function erSikker(l) {
+    var a = arkFor(l);
+    return !l.utenfor && !l.krever_valg && l.konf >= T.hoy_konfidens && !l.flagg.some(function (f) { return f.alvor !== 'info'; }) &&
+      !(a && a.flagg.some(function (f) { return f.alvor !== 'info'; }));
+  }
+  function utkast(l) {
+    if (!state.utkast[l.id]) state.utkast[l.id] = { konto: l.krever_valg || l.utenfor ? '' : (l.konto || ''), kommentar: '' };
+    return state.utkast[l.id];
+  }
+
+  /** Én beslutning, gjennom samme regler som Python-PoC-en (motor.vurder). */
+  function beslutt(l, valg, merknad) {
+    var run = state.run, u = utkast(l), konto = '';
+    if (valg === 'godta') konto = l.konto;
+    else if (valg === 'endre') {
+      konto = u.konto;
+      if (!konto) { state.radFeil[l.id] = 'Velg konto i listen først.'; return; }
+      if (konto === l.konto && !l.krever_valg) valg = 'godta';
+    }
+    var r = motor.vurder(run, l, valg, konto, valg ? u.kommentar : '');
+    if (r.feil) { state.radFeil[l.id] = r.feil; return; }
+    delete state.radFeil[l.id];
+    if (!r.endret) return;
+    if (state.eksport) state.eksport.utdatert = true;
+    state.bekreft = false;
+    var b = run.beslutninger[l.id];
+    if (b && b.konto) u.konto = b.konto;
+    Logg.skriv('beslutning', { kjoring: run.id, linje: l.id, etikett: l.etikett, kilde: l.kilde, forslag: l.konto, konfidens: l.konf,
+      flagg: l.flagg.map(function (f) { return f.kode; }), valg: b ? b.valg : 'angret', konto: b ? b.konto : null,
+      kommentar: b ? b.kommentar : '', merknad: merknad || '' });
+  }
+
+  function statusTekst(l) {
+    var b = state.run.beslutninger[l.id];
+    if (l.utenfor && !b) return ['', 'Ikke bekreftet'];
+    if (l.utenfor && b.valg === 'utenfor') return ['s-utelatt', 'Bekreftet holdt utenfor'];
+    if (l.utenfor) return ['s-endret', 'Tatt med som kostnad: ' + b.konto];
+    if (!b) return ['', 'Ikke vurdert'];
+    if (b.valg === 'avvis') return ['s-utelatt', 'Utelatt fra import'];
+    if (b.valg === 'godta') return ['s-godtatt', 'Godtatt: ' + b.konto];
+    if (b.konto === l.konto || !l.konto) return ['s-godtatt', 'Valgt selv: ' + b.konto];
+    return ['s-endret', 'Endret: ' + l.konto + ' → ' + b.konto];
+  }
+  function statusHtml(l) { var t = statusTekst(l); return '<span class="status ' + t[0] + '">' + esc(t[1]) + '</span>'; }
+  function ulagretHtml(l) {
+    var b = state.run.beslutninger[l.id], u = utkast(l);
+    var vis = b && b.valg !== 'avvis' && u.konto && u.konto !== b.konto;
+    return '<span class="hint" id="h-' + l.id + '"' + (vis ? '' : ' hidden') + '>Endringen i listen er ikke lagret. Trykk «Bruk valgt konto».</span>';
+  }
+
+  function kontoValg(l, valgt) {
+    var kp = motor.kp;
+    var visAlt = l.konf < T.hoy_konfidens || l.krever_valg;
+    var forslag = [[l.konto, null]].concat(visAlt ? (l.alternativer || []).map(function (a) { return [a.konto, a.score]; }) : [])
+      .filter(function (k) { return k[0] && kp.kontoer[k[0]] && kp.kontoer[k[0]].type === 'kostnad'; });
+    var alle = kp.rekkefolge.filter(function (k) { return kp.kontoer[k].type === 'kostnad'; });
+    var opt = function (k, merk) { return '<option value="' + k + '"' + (k === valgt ? ' selected' : '') + '>' + k + ' ' + esc(kp.kontoer[k].navn) + (merk ? ' ' + merk : '') + '</option>'; };
+    return '<option value=""' + (!valgt ? ' selected' : '') + '>Velg konto</option>' +
+      (forslag.length ? '<optgroup label="Forslag">' + forslag.map(function (k, i) { return opt(k[0], i === 0 ? '(forslag)' : (k[1] < 0.5 ? '(svak likhet)' : '(alternativ)')); }).join('') + '</optgroup>' : '') +
+      '<optgroup label="Alle kostnadskontoer">' + alle.map(function (k) { return opt(k); }).join('') + '</optgroup>';
+  }
+
+  function radHtml(l) {
+    var b = state.run.beslutninger[l.id] || {}, u = utkast(l), ark = arkFor(l);
+    var cls = [l.utenfor ? 'utenfor' : '', b.valg ? (b.valg === 'avvis' || b.valg === 'utenfor' ? 'avvist' : 'vurdert') : ''].join(' ');
+    var kontoCelle, beslutning, navn = esc(l.etikett);
+    if (l.utenfor) {
+      kontoCelle = '<span class="mono">' + esc(l.konto) + '</span> ' + esc(l.navn) +
+        '<label class="skjult-for-skjerm" for="k-' + l.id + '">Kostnadskonto for ' + navn + ', hvis linjen er en kostnad</label><select id="k-' + l.id + '" data-linje="' + l.id + '" data-rolle="konto">' + kontoValg(l, u.konto) + '</select>';
+      var harB = !!b.valg, holdtUtenfor = b.valg === 'utenfor';
+      beslutning = '<div class="beslutning"><div class="rad">' + statusHtml(l) +
+        (harB ? '<button class="lenkeknapp liten-tekst" id="a-' + l.id + '" data-rolle="angre" data-linje="' + l.id + '" aria-label="Angre for ' + navn + '">Angre</button>' : '') + '</div>' +
+        '<div class="handlinger">' +
+        (harB ? '' : '<button class="knapp liten sekundaer" id="q-' + l.id + '" data-rolle="kvitter" data-linje="' + l.id + '" aria-label="Bekreft at ' + navn + ' holdes utenfor">Bekreft utenfor</button>') +
+        (holdtUtenfor ? '' : '<button class="knapp liten sekundaer" id="e-' + l.id + '" data-rolle="endre" data-linje="' + l.id + '"' + (u.konto ? '' : ' disabled') + ' aria-label="Ta med ' + navn + ' som kostnad på valgt konto">Ta med som kostnad</button>') +
+        '</div><span class="hint">Er linjen egentlig en kostnad, velg kostnadskonto i listen og trykk «Ta med som kostnad».</span>' +
+        (state.radFeil[l.id] ? '<span class="feilmelding" role="alert">' + esc(state.radFeil[l.id]) + '</span>' : '') + '</div>';
+    } else {
+      var valgt = u.konto;
+      kontoCelle = '<label class="skjult-for-skjerm" for="k-' + l.id + '">Konto for ' + navn + '</label><select id="k-' + l.id + '" data-linje="' + l.id + '" data-rolle="konto">' + kontoValg(l, valgt) + '</select>';
+      var harAvvik = l.flagg.some(function (f) { return f.alvor !== 'info'; }) || (ark && ark.flagg.some(function (f) { return f.alvor !== 'info'; }));
+      var maaKvitteres = l.flagg.concat(ark ? ark.flagg : []).some(function (f) { return M.KVITTER_KODER.indexOf(f.kode) >= 0; });
+      beslutning = '<div class="beslutning"><div class="rad">' + statusHtml(l) +
+        (b.valg ? '<button class="lenkeknapp liten-tekst" id="a-' + l.id + '" data-rolle="angre" data-linje="' + l.id + '" aria-label="Angre vurderingen av ' + navn + '">Angre</button>' : '') + '</div>' +
+        '<div class="handlinger">' +
+        '<button class="knapp liten godta" id="g-' + l.id + '" data-rolle="godta" data-linje="' + l.id + '"' + (l.krever_valg || !l.konto ? ' disabled' : '') + ' aria-label="Godta forslaget for ' + navn + '">Godta</button>' +
+        '<button class="knapp liten sekundaer" id="e-' + l.id + '" data-rolle="endre" data-linje="' + l.id + '"' + (u.konto ? '' : ' disabled') + ' aria-label="Bruk valgt konto for ' + navn + '">Bruk valgt konto</button>' +
+        '<button class="knapp liten utelat" id="u-' + l.id + '" data-rolle="utelat" data-linje="' + l.id + '" aria-label="Utelat ' + navn + ' fra importen">Utelat</button></div>' +
+        '<label class="skjult-for-skjerm" for="c-' + l.id + '">Kommentar til ' + navn + '</label><input type="text" id="c-' + l.id + '" data-linje="' + l.id + '" data-rolle="kommentar" placeholder="Kommentar (valgfri)" value="' + esc(b.kommentar !== undefined && b.valg ? b.kommentar : u.kommentar) + '">' +
+        ulagretHtml(l) +
+        (l.krever_valg ? '<span class="hint">Usikkert forslag. Velg konto i listen og trykk «Bruk valgt konto».</span>' : (harAvvik ? '<span class="hint">«Godta» bekrefter også avvikene som er vist.</span>' : '')) +
+        (maaKvitteres ? '<span class="hint">Høy-avvik må i tillegg kvitteres med kommentar under «Avvik og mangler».</span>' : '') +
+        (state.radFeil[l.id] ? '<span class="feilmelding" role="alert">' + esc(state.radFeil[l.id]) + '</span>' : '') + '</div>';
+    }
+    var celleRef = (l.celler && l.celler.ref) || l.kilde;
+    return '<tr id="rad-' + l.id + '" class="' + cls + '" tabindex="-1">' +
+      '<td style="min-width:9.5rem"><div class="etikett">' + navn + '</div><button class="kildeknapp" data-rolle="kilde" data-linje="' + l.id + '" aria-label="Vis kildecellene ' + esc(l.kilde) + '">' + esc(celleRef) + '</button></td>' +
+      '<td style="min-width:9.5rem"><div class="tall" style="font-weight:600">' + M.kr(l.total) + '</div><span class="dempet" style="font-size:.8rem">' + esc(l.periodisering) + '</span>' + mndHtml(l) + '</td>' +
+      '<td><div class="forslag"><div class="forslag-topp">' + kontoCelle + konfHtml(l.konf, T.sikker_konto) + '</div>' +
+      '<span>' + vis(l.begrunnelse) + '</span><span class="regelkilde">Regelkilde: ' + esc(l.kilde_regel || 'ingen') + '</span></div></td>' +
+      '<td style="min-width:13rem">' + (flaggHtml(l.flagg, l) || '<span class="dempet">Ingen</span>') + '</td>' +
+      '<td>' + beslutning + '</td></tr>';
+  }
+
+  function stegHtml(av) {
+    var linjer = M.alleLinjer(state.run).filter(function (l) { return !l.utenfor; });
+    var vurdert = linjer.filter(function (l) { return state.run.beslutninger[l.id]; }).length;
+    var ubekr = ubekreftede().length;
+    var ferdig = vurdert === linjer.length && !ubekr;
+    var eksp = state.eksport && !state.eksport.utdatert;
+    var lestTekst = state.run.ark.length + ' ark, ' + M.alleLinjer(state.run).length + ' linjer' +
+      (av.ulest_ark ? ', ' + flertall(av.ulest_ark, 'ark', 'ark') + ' ikke fullstendig lest' : '') + (av.ulest ? ', ' + M.kr(av.ulest) + ' kr ikke lest' : '');
+    var s = [
+      { t: 'Innlesing', st: lestTekst, f: !av.ulest && !av.ulest_ark },
+      { t: 'Vurdering', st: vurdert + ' av ' + linjer.length + ' linjer vurdert' + (ubekr ? ', ' + flertall(ubekr, 'inntektslinje', 'inntektslinjer') + ' ikke bekreftet' : ''), f: ferdig },
+      { t: 'Avstemming', st: av.stemmer ? (ferdig ? 'Stemmer, alt vurdert' : 'Stemmer, ' + M.kr(av.ikke_vurdert) + ' kr gjenstår') : 'Stemmer ikke', f: av.stemmer && ferdig },
+      { t: 'Importfil', st: eksp ? 'Laget, ' + state.eksport.rader + ' rader' : (state.eksport ? 'Utdatert, lag på nytt' : 'Ikke laget'), f: eksp },
+    ];
+    var aktiv = s.findIndex(function (x) { return !x.f; });
+    return '<ol class="steg" aria-label="Fremdrift">' + s.map(function (x, i) {
+      return '<li class="' + (x.f ? 'ferdig' : (i === aktiv ? 'aktiv' : '')) + '"><span class="nr">STEG ' + (i + 1) + '</span><span class="tittel">' + x.t + '</span><span class="status-tekst steg-status">' + esc(x.st) + '</span></li>';
+    }).join('') + '</ol>';
+  }
+
+  function renderStatus() {
+    var run = state.run, av = M.avstemming(run), linjer = M.alleLinjer(run);
+    var aktive = linjer.filter(function (l) { return !l.utenfor; });
+    var vurdert = aktive.filter(function (l) { return run.beslutninger[l.id]; }).length;
+    var synlige = alleFlagg().filter(function (x) { return x.f.alvor !== 'info'; });
+    var nHoy = synlige.filter(function (x) { return x.f.alvor === 'høy'; }).length;
+    $('b-status').innerHTML = '<div class="panel">' + stegHtml(av) + '<dl class="tallrekke">' +
+      '<div><dt>Linjer</dt><dd>' + linjer.length + '</dd></div>' +
+      '<div><dt>Vurdert</dt><dd>' + vurdert + ' / ' + aktive.length + '</dd></div>' +
+      '<div><dt>Avvik høy</dt><dd style="color:var(--hoy)">' + nHoy + '</dd></div>' +
+      '<div><dt>Avvik middels</dt><dd style="color:var(--middels)">' + (synlige.length - nHoy) + '</dd></div>' +
+      '<div><dt>Kostnader i arkene</dt><dd>' + M.kr(av.kilde - av.utenfor) + '</dd></div>' +
+      '<div><dt>Inntekter holdt utenfor</dt><dd>' + M.kr(av.utenfor) + '</dd></div></dl></div>';
+    oppdaterTellere();
+  }
+
+  function alleFlagg() {
+    var ut = [];
+    state.run.ark.forEach(function (a) { a.flagg.forEach(function (f) { ut.push({ f: f, navn: a.fil + (state.run.ark.filter(function (x) { return x.fil === a.fil; }).length > 1 ? ' / ' + a.ark : ''), linje: null }); }); });
+    M.alleLinjer(state.run).forEach(function (l) { l.flagg.forEach(function (f) { ut.push({ f: f, navn: l.etikett, linje: l }); }); });
+    var orden = { 'høy': 0, 'middels': 1, 'info': 2 };
+    return ut.sort(function (a, b) { return orden[a.f.alvor] - orden[b.f.alvor]; });
+  }
+
+  function renderFiler() {
+    var run = state.run;
+    $('b-filer').innerHTML = '<div class="kort"><div class="kort-hode"><h2>Innleste budsjettark</h2><div class="rad">' +
+      '<button class="knapp sekundaer liten" data-rolle="vis-kilde" data-fil="0">Vis kildeark</button>' +
+      '<button class="knapp sekundaer liten" id="last-opp" data-rolle="last-opp">Last opp egne .xlsx</button>' +
+      (state.kildeNavn !== 'demo' ? '<button class="knapp sekundaer liten" id="tilbake-demo" data-rolle="tilbake-demo">Tilbake til demoarkene</button>' : '<button class="knapp sekundaer liten" id="nullstill" data-rolle="nullstill">Nullstill vurderingene</button>') +
+      '</div></div>' +
+      (state.melding ? '<div class="melding ' + state.melding.type + '" role="status">' + esc(state.melding.tekst) + '</div>' : '') +
+      '<p><b>Budsjettår: ' + state.run.aar + '.</b> <span class="dempet">Ark som ser ut til å gjelde et annet år, flagges.</span></p>' +
+      '<p class="dempet">' + (state.kildeNavn === 'demo' ? 'Tre syntetiske ark fra tre avdelinger, i tre ulike formater. Opplastede filer leses bare i nettleseren. Bruk kun syntetiske data.' : 'Opplastede ark: ' + esc(state.kildeNavn) + '. Filene er lest i nettleseren og ikke sendt noe sted.') + '</p>' +
+      '<div class="filer">' + run.ark.map(function (a) {
+        var fi = state.filer.findIndex(function (f) { return f.navn === a.fil; });
+        var lagd = a.flagg.filter(function (f) { return M.ULEST_KODER.indexOf(f.kode) >= 0; }).length;
+        return '<div class="fil"><span class="navn">' + esc(a.fil) + '</span><dl>' +
+          '<dt>Ark</dt><dd>' + esc(a.ark) + ' (' + (a.layout === 'bred' ? 'perioder i kolonner' : 'liste med fordeling') + ')</dd>' +
+          '<dt>Avdeling</dt><dd>' + (a.avdeling ? esc(a.avdeling) + ' <span class="dempet">fra ' + esc({ celle: 'celle i arket', arknavn: 'arknavnet', filnavn: 'filnavnet' }[a.avdeling_kilde]) + '</span>' : 'ukjent') + '</dd>' +
+          '<dt>Enhet</dt><dd>' + (a.enhet === 1000 ? 'tusen kr → omregnet' : 'hele kr') + '</dd>' +
+          '<dt>Linjer</dt><dd>' + a.linjer.length + (lagd ? ' <span class="pille høy">ikke fullstendig lest</span>' : '') + '</dd></dl>' +
+          '<button class="lenkeknapp" style="justify-self:start;font-size:.84rem" data-rolle="vis-kilde" data-fil="' + Math.max(0, fi) + '" data-ark="' + esc(a.ark) + '" aria-label="Åpne kildearket ' + esc(a.fil) + ', ark ' + esc(a.ark) + '">Åpne kildearket</button></div>';
+      }).join('') + '</div></div>';
+  }
+
+  /** Kvittering med kommentar for høy-flagg som må kvitteres før eksport (motor.kvitter). */
+  function kvitteringHtml(k) {
+    if (!k) return '';
+    var kv = state.run.kvitteringer[k.nokkel], id = 'kv-' + k.nokkel.replace(/[^A-Za-z0-9]/g, '-');
+    if (kv) {
+      return '<div class="kvittering"><span class="status s-godtatt">Kvittert</span><span class="dempet liten-tekst">«' + esc(kv.kommentar) + '»</span>' +
+        '<button class="lenkeknapp liten-tekst" id="' + id + '-angre" data-rolle="angre-flagg" data-nokkel="' + esc(k.nokkel) + '" aria-label="Angre kvitteringen av ' + esc(k.kode) + ' for ' + esc(k.hvor) + '">Angre</button></div>';
+    }
+    if (!k.gjelder) return '<div class="kvittering dempet liten-tekst">Gjelder bare linjer som er utelatt; trengs ikke kvittert.</div>';
+    return '<div class="kvittering"><label class="skjult-for-skjerm" for="' + id + '">Kommentar som kvitterer ut ' + esc(k.kode) + ' for ' + esc(k.hvor) + '</label>' +
+      '<input type="text" id="' + id + '" data-rolle="kvittering-tekst" data-nokkel="' + esc(k.nokkel) + '" placeholder="Kommentar (kreves for å kvittere)" value="' + esc(state.kvUtkast[k.nokkel] || '') + '">' +
+      '<button class="knapp liten sekundaer" id="' + id + '-knapp" data-rolle="kvitter-flagg" data-nokkel="' + esc(k.nokkel) + '">Kvitter</button>' +
+      (state.kvFeil[k.nokkel] ? '<span class="feilmelding" role="alert">' + esc(state.kvFeil[k.nokkel]) + '</span>' : '') + '</div>';
+  }
+
+  function renderAvvik() {
+    var synlige = alleFlagg().filter(function (x) { return x.f.alvor !== 'info'; });
+    var kv = new Map(M.kvitteringspliktige(state.run).map(function (k) { return [k.flagg, k]; }));
+    $('b-avvik').innerHTML = '<div class="kort"><div class="kort-hode"><h2>Avvik og mangler</h2><span class="dempet">' + synlige.length + ' funnet. Ingenting er rettet automatisk.</span></div>' +
+      '<p class="dempet liten-tekst">Feil i selve kildearket, som manglende avdeling eller uleste rader, rettes i arket, som så lastes inn på nytt. Sumavvik, avvik mot arkets totalsum, annet budsjettår, ukjent enhet og ukjent konto kan i stedet kvitteres med en kommentar; det må gjøres før importfilen lages.</p>' +
+      (synlige.length ? '<ul class="avvik">' + synlige.map(function (x) {
+        return '<li>' + pille(x.f.alvor) + '<span class="hva"><b>' + esc(x.navn) + '</b>: ' + vis(x.f.tekst) + kvitteringHtml(kv.get(x.f)) + '</span>' +
+          (x.linje ? '<button class="lenkeknapp" style="font-size:.84rem" data-rolle="gaa-til" data-linje="' + x.linje.id + '" aria-label="Gå til linjen ' + esc(x.linje.etikett) + '">Gå til linjen</button>' : '<span></span>') + '</li>';
+      }).join('') + '</ul>' : '<p>Ingen avvik.</p>') + '</div>';
+  }
+
+  function renderTabeller() {
+    $('b-tabeller').innerHTML = state.run.ark.map(function (a) {
+      return '<div class="kort"><div class="kort-hode"><h3>' + esc(a.fil) + (state.run.ark.filter(function (x) { return x.fil === a.fil; }).length > 1 ? ' / ' + esc(a.ark) : '') + '</h3><span class="dempet">Avdeling ' + esc(a.avdeling || 'ukjent') + ' · ' + flertall(a.linjer.length, 'linje', 'linjer') + '</span></div>' +
+        (a.linjer.length ? '<div class="rull"><table><thead><tr><th>Linje og kildeceller</th><th>Beløp NOK og fordeling</th><th>Kontoforslag, konfidens og begrunnelse</th><th>Avvik</th><th>Beslutning</th></tr></thead><tbody>' +
+          a.linjer.map(radHtml).join('') + '</tbody></table></div>' : '<p class="dempet">Ingen linjer lest fra dette arket. Se avvikene over.</p>') + '</div>';
+    }).join('');
+  }
+
+  function ubekreftede() { return M.alleLinjer(state.run).filter(function (l) { return l.utenfor && !state.run.beslutninger[l.id]; }); }
+  /** Det som stopper eksporten, med samme regler og tekster som Python-PoC-en (eksportfeil). */
+  function uiMangler() { return M.eksportfeil(state.run); }
+
+  function renderAvslutning() {
+    var run = state.run, av = M.avstemming(run), mangler = uiMangler();
+    var sikre = M.alleLinjer(run).filter(function (l) { return erSikker(l) && !run.beslutninger[l.id]; });
+    var pst = function (x) { return av.kilde ? (x / av.kilde * 100) : 0; };
+    var h = '<div class="rutenett-2">' +
+      '<div class="kort"><h2>Avstemming</h2>' +
+      '<div class="stabel" role="img" aria-label="' + esc('Kildesum ' + M.kr(av.kilde) + ' kr: godkjent ' + M.kr(av.godkjent) + ', utelatt ' + M.kr(av.avvist) + ', holdt utenfor ' + M.kr(av.utenfor) + ', ikke vurdert ' + M.kr(av.ikke_vurdert)) + '">' +
+      '<span class="s-godkjent" style="width:' + pst(av.godkjent) + '%"></span><span class="s-avvist" style="width:' + pst(av.avvist) + '%"></span>' +
+      '<span class="s-utenfor" style="width:' + pst(av.utenfor) + '%"></span><span class="s-ikke" style="width:' + pst(av.ikke_vurdert) + '%"></span></div>' +
+      '<div class="forklaring" aria-hidden="true"><span><i class="s-godkjent"></i>Godkjent</span><span><i class="s-avvist"></i>Utelatt</span><span><i class="s-utenfor"></i>Holdt utenfor</span><span><i class="s-ikke"></i>Ikke vurdert</span></div>' +
+      '<p class="likning">Lest fra arkene <span class="tall">' + M.kr(av.kilde) + '</span> = godkjent <span class="tall">' + M.kr(av.godkjent) + '</span> + utelatt <span class="tall">' + M.kr(av.avvist) +
+      '</span> + holdt utenfor <span class="tall">' + M.kr(av.utenfor) + '</span> + ikke vurdert <span class="tall">' + M.kr(av.ikke_vurdert) + '</span>. ' +
+      'Ikke lest: <span class="tall">' + M.kr(av.ulest) + '</span>' + (av.ulest_ark ? ', og ' + flertall(av.ulest_ark, 'ark', 'ark') + ' er ikke fullstendig lest' : '') + '. <span class="' + (av.stemmer ? 'ok' : 'feil') + '">' + (av.stemmer ? 'Stemmer.' : 'Stemmer ikke.') + '</span></p>' +
+      '<p class="dempet liten-tekst">Rader med beløp uten tekst, celler som ikke kan leses som beløp og ark som ikke kan leses, stopper eksporten. Importfilen summeres på nytt når den lages; avviker summen fra «godkjent», stoppes eksporten.</p></div>' +
+      '<div class="kort"><h2 id="godkjenning-tittel" tabindex="-1">Godkjenning</h2>' +
+      '<div class="rad"><button class="knapp sekundaer" id="godta-sikre" data-rolle="godta-sikre"' + (sikre.length ? '' : ' disabled') + '>Godta sikre linjer (' + sikre.length + ')</button></div>' +
+      '<p class="dempet liten-tekst">Gjelder linjer med konfidens ' + komma(T.hoy_konfidens) + ' eller høyere, uten avvik på linjen eller arket. Hver linje logges som din beslutning.</p>' +
+      (mangler.length ? '<ul class="mangler">' + mangler.map(function (m) { return '<li>' + esc(m) + '</li>'; }).join('') + '</ul>' : '') +
+      (state.bekreft ? bekreftHtml(av) : '<div class="rad"><button class="knapp" id="godkjenn" data-rolle="godkjenn"' + (mangler.length ? ' disabled' : '') + '>Godkjenn og lag importfil</button></div>') +
+      '</div></div>';
+    if (state.eksport) h += eksportHtml();
+    $('b-avslutning').innerHTML = h;
+  }
+
+  function bekreftHtml(av) {
+    var run = state.run, linjer = M.alleLinjer(run);
+    var b = function (l) { return run.beslutninger[l.id]; };
+    var g = linjer.filter(function (l) { return b(l) && b(l).valg !== 'avvis'; }).length;
+    var e = linjer.filter(function (l) { return b(l) && b(l).valg === 'endre' && l.konto && b(l).konto !== l.konto && !l.utenfor; }).length;
+    var kost = linjer.filter(function (l) { return l.utenfor && b(l); }).length;
+    var a = linjer.filter(function (l) { return b(l) && b(l).valg === 'avvis'; }).length;
+    return '<div class="bekreft" role="group" aria-label="Bekreft godkjenning"><strong>Du godkjenner ' + flertall(g, 'linje', 'linjer') + ' (' + M.kr(av.godkjent) + ' kr) for import, hvorav ' + e + ' med endret konto' + (kost ? ' og ' + kost + ' tatt med som kostnad' : '') + '. ' + flertall(a, 'linje er', 'linjer er') + ' utelatt. ' + M.kr(av.utenfor) + ' kr holdes utenfor som inntekt.</strong>' +
+      '<span>Importfilen lages nå. Den leses inn i Genus av deg, ikke av systemet.</span>' +
+      '<div class="rad"><button class="knapp" id="bekreft-eksport" data-rolle="bekreft-eksport">Bekreft og lag importfil</button><button class="knapp sekundaer" id="avbryt-eksport" data-rolle="avbryt-eksport">Avbryt</button></div></div>';
+  }
+
+  function eksportHtml() {
+    var x = state.eksport, linjer = x.tekst.trim().split('\n');
+    return '<div class="kort" id="importfil" tabindex="-1"><div class="kort-hode"><h2>Importfil til Genus</h2>' + (x.utdatert ? pille('middels', 'Utdatert etter endringer') : pille('ok', 'Klar')) + '</div>' +
+      (x.utdatert ? '<p>Vurderingene er endret etter at filen ble laget. Lag en ny importfil før innlesing.</p>' : '') +
+      '<dl class="tallrekke"><div><dt>Fil</dt><dd class="mono" style="font-size:.85rem">' + esc(x.filnavn) + '</dd></div><div><dt>Rader</dt><dd>' + x.rader + '</dd></div><div><dt>Sum NOK</dt><dd>' + M.kr(x.sum) + '</dd></div></dl>' +
+      '<p class="hash"><span class="dempet">SHA-256: </span>' + esc(x.sha) + '</p>' +
+      '<pre class="csv" tabindex="0" aria-label="Utdrag av importfilen">' + esc(linjer.slice(0, 16).join('\n')) + (linjer.length > 16 ? '\n… ' + (linjer.length - 16) + ' rader til' : '') + '</pre>' +
+      '<div class="rad"><button class="knapp sekundaer" id="kopier" data-rolle="kopier">Kopier hele filen</button><span class="dempet" id="kopistatus" role="status"></span></div>' +
+      (state.kopiFallback ? '<textarea class="kopi" id="kopifelt" readonly aria-label="Importfil (CSV), merk og kopier">' + esc(x.tekst) + '</textarea>' : '') +
+      '<p class="dempet liten-tekst">Formatet er en antakelse til Genus’ faktiske importformat er avklart. I den lokale PoC-en lastes filen ned; her kan du kopiere den.</p></div>';
+  }
+
+  function renderBudsjett() { renderStatus(); renderFiler(); renderAvvik(); renderTabeller(); renderAvslutning(); }
+
+  /** Etter en beslutning: bare raden, statusen og avslutningen tegnes på nytt, så rulling og fokus bevares. */
+  function oppdaterRad(l, fokusId) {
+    var gml = $('rad-' + l.id);
+    if (gml) {
+      var tmp = document.createElement('tbody');
+      tmp.innerHTML = radHtml(l);
+      gml.replaceWith(tmp.firstChild);
+    }
+    renderStatus(); renderAvvik(); renderAvslutning();
+    medFokus(fokusId);
+    if (fokusId !== undefined) kunngjor(l.etikett + ': ' + (state.radFeil[l.id] || statusTekst(l)[1]));
+  }
+
+  // ---------- Kildevindu ----------
+  function aapneKilde(filIndex, linjeId, arknavn) {
+    state.kilde = { fil: filIndex || 0, linje: linjeId || null, ark: arknavn || null };
+    if (linjeId) {
+      var l = finnLinje(linjeId), a = l && arkFor(l);
+      var fi = a ? state.filer.findIndex(function (f) { return f.navn === a.fil; }) : -1;
+      if (fi >= 0) state.kilde.fil = fi;
+      if (a) state.kilde.ark = a.ark;
+    }
+    renderKilde();
+    var d = $('kildevindu');
+    if (!d.open) { if (d.showModal) d.showModal(); else d.setAttribute('open', ''); }
+    var hl = $('kildeark').querySelector('td.hl') || (state.kilde.ark && $('kildeark').querySelector('[data-arknavn="' + CSS.escape(state.kilde.ark) + '"]'));
+    if (hl) hl.scrollIntoView({ block: 'center', inline: 'center' });
+  }
+  function renderKilde() {
+    var f = state.filer[state.kilde.fil];
+    var l = state.kilde.linje ? finnLinje(state.kilde.linje) : null;
+    var la = l && arkFor(l);
+    if (la && la.fil !== f.navn) { l = null; la = null; }
+    $('kildetittel').textContent = f.navn;
+    $('kildefaner').innerHTML = state.filer.map(function (ff, i) {
+      return '<button class="knapp liten ' + (i === state.kilde.fil ? '' : 'sekundaer') + '" data-kfil="' + i + '"' + (i === state.kilde.fil ? ' aria-current="true"' : '') + '>' + esc(ff.navn) + '</button>';
+    }).join('');
+    $('kildeinfo').innerHTML = l ? 'Markert: cellene bak «' + esc(l.etikett) + '» (' + esc(l.celler.ref) + ')' + (l.celler.sum !== undefined ? '. Rød celle er arkets egen sum, som ikke stemmer.' : '.') : 'Velg en cellehenvisning i tabellen for å markere cellene.';
+    var h = '';
+    f.ark.forEach(function (a) {
+      var bredde = a.rader.reduce(function (m, r) { return Math.max(m, (r || []).length); }, 0);
+      h += '<h3 data-arknavn="' + esc(a.navn) + '" style="margin:10px 8px 6px">Ark: ' + esc(a.navn) + '</h3>';
+      h += '<table><caption class="skjult-for-skjerm">Ark ' + esc(a.navn) + '</caption><thead><tr><th scope="col"><span class="skjult-for-skjerm">Rad</span></th>';
+      for (var c = 0; c < bredde; c++) h += '<th scope="col">' + M.kolonne(c + 1) + '</th>';
+      h += '</tr></thead><tbody>';
+      a.rader.forEach(function (r, ri) {
+        h += '<tr><th scope="row">' + (ri + 1) + '</th>';
+        for (var c = 0; c < bredde; c++) {
+          var v = r && c < r.length && r[c] !== null && r[c] !== undefined ? r[c] : '';
+          if (v instanceof Date) { var p2 = function (n) { return String(n).padStart(2, '0'); }; v = p2(v.getDate()) + '.' + p2(v.getMonth() + 1) + '.' + v.getFullYear(); }
+          var cls = '';
+          if (l && la && l.celler.ark === a.navn && l.celler.rad === ri) {
+            if (l.celler.kolonner.indexOf(c) >= 0) cls = 'hl';
+            else if (c === 0) cls = 'hl-etikett';
+            if (l.celler.sum === c) cls = 'hl-sum';
+          }
+          h += '<td class="' + cls + '">' + esc(v) + '</td>';
+        }
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+    });
+    $('kildeark').innerHTML = h;
+  }
+
+  // ---------- Opplasting ----------
+  function lesOpplasting(filliste) {
+    if (!window.XLSX) { state.melding = { type: 'feil', tekst: 'Excel-leseren er ikke lastet. Demoarkene virker fortsatt.' }; renderFiler(); return; }
+    var filer = Array.from(filliste).filter(function (f) { return /\.xlsx$/i.test(f.name); });
+    if (!filer.length) { state.melding = { type: 'feil', tekst: 'Velg minst én .xlsx-fil.' }; renderFiler(); return; }
+    Promise.all(filer.map(function (f) {
+      return f.arrayBuffer().then(function (buf) {
+        return M.sha256Bytes(buf).then(function (sha) {
+          var wb = M.arbeidsbokFraSheetJS(XLSX, buf, f.name);
+          wb.sha256 = sha;
+          return wb;
+        });
+      });
+    })).then(function (lest) {
+      lest.sort(function (a, b) { return a.navn < b.navn ? -1 : a.navn > b.navn ? 1 : 0; });
+      // Persondata stopper innlesingen før noe analyseres. Bare type og celle vises og logges, ikke verdien.
+      var funn = lest.reduce(function (a, f) { return a.concat(M.finnPersondata(f)); }, []);
+      if (funn.length) {
+        Logg.skriv('innlesing_stoppet', { grunn: 'persondata', filer: lest.map(function (f) { return { navn: f.navn, sha256: f.sha256 }; }), funn: funn });
+        state.melding = { type: 'feil', tekst: M.persondataTekst(funn) }; renderFiler(); medFokus('last-opp'); kunngjor(state.melding.tekst); return;
+      }
+      var proeve = motor.analyser(lest, 2027);
+      if (!proeve.ark.length) { state.melding = { type: 'feil', tekst: 'Fant ingen budsjettabell i filene. Arket må ha en rad med minst tre perioder (Jan–Des eller Q1–Q4) eller en kolonne «Beløp».' }; renderFiler(); return; }
+      nyKjoring(lest, lest.map(function (f) { return f.navn; }).join(', '));
+      state.melding = { type: 'ok', tekst: 'Leste ' + flertall(state.run.ark.length, 'ark', 'ark') + ' fra ' + flertall(lest.length, 'fil', 'filer') + '.' };
+      renderBudsjett(); medFokus('last-opp'); kunngjor(state.melding.tekst);
+    }).catch(function (e) { state.melding = { type: 'feil', tekst: 'Kunne ikke lese filen: ' + e.message }; renderFiler(); });
+  }
+
+  // ---------- Kontering ----------
+  function nyKontering() {
+    state.k = { forslag: kont.foreslaaAlle(D.fakturaer, D.historikk), beslutninger: {}, utkast: {}, feil: {}, visFasit: false, loo: state.k.loo };
+    Logg.skriv('konteringsforslag', { fakturaer: D.fakturaer.length, historikk: D.historikk.length,
+      forslag: state.k.forslag.map(function (f) { return { bilag: f.bilag, konto: f.konto, konf: f.konf, kostnadssted: f.kostnadssted, flagg: f.flagg.map(function (x) { return x.kode; }) }; }) });
+  }
+  function kSperret(fo) { return !fo.konto || fo.konf < KONF_GRENSE_KONTERING; }
+  function kUtkast(i) {
+    var f = D.fakturaer[i], fo = state.k.forslag[i];
+    if (!state.k.utkast[f.bilag]) state.k.utkast[f.bilag] = { konto: kSperret(fo) ? '' : fo.konto, ks: kSperret(fo) ? '' : (fo.kostnadssted || ''), kommentar: '' };
+    return state.k.utkast[f.bilag];
+  }
+  function kBeslutt(i, valg) {
+    var f = D.fakturaer[i], fo = state.k.forslag[i], u = kUtkast(i), bil = f.bilag, gml = state.k.beslutninger[bil], konto = null, ks = null;
+    if (!valg) { delete state.k.beslutninger[bil]; delete state.k.feil[bil]; if (gml) Logg.skriv('kontering', { bilag: bil, valg: 'angret' }); return; }
+    if (valg === 'godta') {
+      if (kSperret(fo)) { state.k.feil[bil] = 'Forslaget er for usikkert til å godtas direkte. Velg konto selv.'; return; }
+      konto = fo.konto;
+    } else if (valg === 'velg') {
+      if (!u.konto) { state.k.feil[bil] = 'Velg konto i listen først.'; return; }
+      konto = u.konto;
+      if (konto === fo.konto && !kSperret(fo)) valg = 'godta';
+    }
+    if (valg !== 'avvis') {
+      if (!u.ks) { state.k.feil[bil] = 'Velg kostnadssted.'; return; }
+      ks = u.ks;
+    }
+    delete state.k.feil[bil];
+    var ny = { valg: valg, konto: konto, kostnadssted: ks, kommentar: u.kommentar.trim() };
+    if (gml && gml.valg === ny.valg && gml.konto === ny.konto && gml.kostnadssted === ny.kostnadssted && gml.kommentar === ny.kommentar) return;
+    state.k.beslutninger[bil] = ny;
+    if (ny.valg !== 'avvis') { u.konto = ny.konto; u.ks = ny.kostnadssted; }
+    Logg.skriv('kontering', { bilag: bil, leverandor: f.leverandor, forslag: fo.konto, konfidens: fo.konf, foreslatt_kostnadssted: fo.kostnadssted,
+      flagg: fo.flagg.map(function (x) { return x.kode; }), valg: ny.valg, konto: ny.konto, kostnadssted: ny.kostnadssted, kommentar: ny.kommentar });
+  }
+
+  function kKontoValg(fo, valgt) {
+    var forslag = fo.kandidater.map(function (k) { return k.konto; });
+    var opt = function (k, merk) { return '<option value="' + k + '"' + (k === valgt ? ' selected' : '') + '>' + k + ' ' + esc(kont.navn[k]) + (merk ? ' ' + merk : '') + '</option>'; };
+    return '<option value=""' + (!valgt ? ' selected' : '') + '>Velg konto</option>' +
+      (forslag.length ? '<optgroup label="Forslag">' + forslag.map(function (k, n) { return opt(k, n === 0 ? '(forslag)' : '(alternativ ' + (n + 1) + ')'); }).join('') + '</optgroup>' : '') +
+      '<optgroup label="Alle kontoer">' + D.konteringKontoplan.map(function (k) { return opt(k.konto); }).join('') + '</optgroup>';
+  }
+
+  function kStatus(fo, b) {
+    if (!b) return '<span class="status">Ikke vurdert</span>';
+    if (b.valg === 'avvis') return '<span class="status s-utelatt">Sendt tilbake</span>';
+    if (b.valg === 'godta') return '<span class="status s-godtatt">Godtatt: ' + esc(b.konto) + ' · ' + esc(b.kostnadssted) + '</span>';
+    if (b.konto === fo.konto || !fo.konto) return '<span class="status s-godtatt">Valgt selv: ' + esc(b.konto) + ' · ' + esc(b.kostnadssted) + '</span>';
+    return '<span class="status s-endret">Endret: ' + esc(fo.konto || '–') + ' → ' + esc(b.konto) + ' · ' + esc(b.kostnadssted) + '</span>';
+  }
+
+  function kRadHtml(f, i) {
+    var fo = state.k.forslag[i], b = state.k.beslutninger[f.bilag], u = kUtkast(i);
+    var ny = !D.historikk.some(function (h) { return h.leverandor === f.leverandor; });
+    var sperret = kSperret(fo), bil = esc(f.bilag);
+    var fasit = state.k.visFasit ? '<td class="mono">' + f.fasit + ' ' + (fo.konto === f.fasit ? pille('ok', 'treff') : (fo.kandidater.some(function (k) { return k.konto === f.fasit; }) ? pille('middels', 'topp 3') : pille('høy', 'bom'))) + '</td>' : '';
+    var hvorfor = fo.kandidater.length ? '<details class="hvorfor"><summary>Hvorfor dette forslaget?</summary><div class="belegg">' + fo.kandidater.map(function (k, n) {
+      var d = k.deler;
+      return '<div class="kand"><strong>' + (n + 1) + '. ' + k.konto + ' ' + esc(k.navn) + ' <span class="dempet mono">poeng ' + komma(k.score) + '</span></strong>' +
+        '<div class="deler" role="img" aria-label="' + esc('Bidrag: leverandørhistorikk ' + komma(0.5 * d.leverandor) + ', konteringsregel ' + komma(0.3 * d.regel) + ', lignende bilag ' + komma(0.2 * d.likhet)) + '"><span class="d-lev" style="width:' + (50 * d.leverandor) + '%"></span><span class="d-regel" style="width:' + (30 * d.regel) + '%"></span><span class="d-likhet" style="width:' + (20 * d.likhet) + '%"></span></div>' +
+        '<ul>' + k.belegg.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>';
+    }).join('') + (fo.kostnadsstedBegrunnelse ? '<p class="liten-tekst"><b>Kostnadssted:</b> ' + esc(fo.kostnadsstedBegrunnelse) + (fo.kostnadssted ? '' : ' Ikke forhåndsvalgt.') + '</p>' : '') +
+      '<p class="forklaring" aria-hidden="true"><span><i class="d-lev"></i>Leverandørhistorikk (50 %)</span><span><i class="d-regel"></i>Konteringsregel (30 %)</span><span><i class="d-likhet"></i>Lignende bilag (20 %)</span></p></div></details>' : '';
+    var visKonto = u.konto, visKs = u.ks;
+    var ulagret = b && b.valg !== 'avvis' && (u.konto !== b.konto || u.ks !== b.kostnadssted);
+    return '<tr id="krad-' + i + '" class="' + (b ? (b.valg === 'avvis' ? 'avvist' : 'vurdert') : '') + '" tabindex="-1">' +
+      '<td><span class="mono">' + bil + '</span><br><span class="dempet tall" style="font-size:.8rem">' + esc(f.dato) + '</span></td>' +
+      '<td style="min-width:11rem">' + esc(f.leverandor) + (ny ? ' ' + pille('ny', 'Ny') : '') + '<div>' + esc(f.tekst) + '</div></td>' +
+      '<td class="h tall">' + M.kr(f.belop) + '</td>' +
+      '<td><div class="forslag"><div class="forslag-topp">' + (fo.konto ? '<strong>' + fo.konto + ' ' + esc(fo.navn) + '</strong>' + konfHtml(fo.konf, KONF_GRENSE_KONTERING) : '<span class="dempet">Ingen forslag</span>') + '</div>' + hvorfor + flaggHtml(fo.flagg) + '</div></td>' +
+      '<td><div class="beslutning"><div class="rad">' + kStatus(fo, b) + (b ? '<button class="lenkeknapp liten-tekst" id="ka-' + i + '" data-k="' + i + '" data-rolle="kangre" aria-label="Angre vurderingen av ' + bil + '">Angre</button>' : '') + '</div>' +
+      '<label class="skjult-for-skjerm" for="kk-' + i + '">Konto for ' + bil + '</label><select id="kk-' + i + '" data-k="' + i + '" data-rolle="kkonto">' + kKontoValg(fo, visKonto) + '</select>' +
+      '<label class="skjult-for-skjerm" for="ks-' + i + '">Kostnadssted for ' + bil + '</label><select id="ks-' + i + '" data-k="' + i + '" data-rolle="kks"><option value="">Velg kostnadssted</option>' +
+      D.kostnadssteder.map(function (k) { return '<option value="' + k.kode + '"' + (k.kode === visKs ? ' selected' : '') + '>' + k.kode + ' ' + esc(k.navn) + '</option>'; }).join('') + '</select>' +
+      '<div class="handlinger">' +
+      '<button class="knapp liten godta" id="kg-' + i + '" data-k="' + i + '" data-rolle="kgodta"' + (sperret ? ' disabled' : '') + ' aria-label="Godta forslaget for ' + bil + '">Godta</button>' +
+      '<button class="knapp liten sekundaer" id="kv-' + i + '" data-k="' + i + '" data-rolle="kvelg" aria-label="Bruk valgt konto for ' + bil + '">Bruk valgt konto</button>' +
+      '<button class="knapp liten utelat" id="ku-' + i + '" data-k="' + i + '" data-rolle="kavvis" aria-label="Send ' + bil + ' tilbake uten kontering">Send tilbake</button></div>' +
+      '<label class="skjult-for-skjerm" for="kc-' + i + '">Kommentar til ' + bil + '</label><input type="text" id="kc-' + i + '" data-k="' + i + '" data-rolle="kkommentar" placeholder="Kommentar (valgfri)" value="' + esc(b ? b.kommentar : u.kommentar) + '">' +
+      '<span class="hint" id="kh-' + i + '"' + (ulagret ? '' : ' hidden') + '>Endringen i listene er ikke lagret. Trykk «Bruk valgt konto».</span>' +
+      (sperret ? '<span class="hint">Usikkert forslag. Velg konto og kostnadssted, og trykk «Bruk valgt konto».</span>' : '') +
+      (state.k.feil[f.bilag] ? '<span class="feilmelding" role="alert">' + esc(state.k.feil[f.bilag]) + '</span>' : '') +
+      '</div></td>' + fasit + '</tr>';
+  }
+
+  function bandTabell(band) {
+    return '<div class="rull"><table><thead><tr><th>Konfidens</th><th class="h">Forslag</th><th class="h">Riktige</th><th class="h">Andel riktige</th></tr></thead><tbody>' +
+      band.map(function (b) { return '<tr><td>' + b.navn + '</td><td class="h tall">' + b.antall + '</td><td class="h tall">' + b.riktige + '</td><td class="h tall">' + (b.antall ? Math.round(b.riktige / b.antall * 100) + ' %' : '–') + '</td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  }
+
+  function renderKStatus() {
+    var k = state.k, n = D.fakturaer.length, vurdert = Object.keys(k.beslutninger).length;
+    var alleFlagg = k.forslag.reduce(function (s, f) { return s + f.flagg.length; }, 0);
+    $('k-status').innerHTML = '<dl class="tallrekke"><div><dt>Fakturaer</dt><dd>' + n + '</dd></div><div><dt>Vurdert</dt><dd>' + vurdert + ' / ' + n + '</dd></div>' +
+      '<div><dt>Konfidens ≥ 0,90</dt><dd>' + k.forslag.filter(function (f) { return f.konf >= 0.9; }).length + '</dd></div><div><dt>Flagg</dt><dd>' + alleFlagg + '</dd></div></dl>';
+    oppdaterTellere();
+  }
+
+  function renderKEval() {
+    var k = state.k, n = D.fakturaer.length, vurdert = Object.keys(k.beslutninger).length, h;
+    if (vurdert < n) {
+      h = '<div class="kort"><h2>Evaluering</h2><p class="dempet">Vurder alle ' + n + ' fakturaene for å se hvor ofte forslaget traff, sammenlignet med fasit (endelig kontering). ' + (n - vurdert) + ' gjenstår.</p></div>';
+    } else {
+      var res = D.fakturaer.map(function (f, i) {
+        var fo = k.forslag[i];
+        return { forslag: fo.konto, fasit: f.fasit, konf: fo.konf, baseline: M.baseline(f, D.historikk), topp3: fo.kandidater.some(function (x) { return x.konto === f.fasit; }) };
+      });
+      var o = M.oppsummer(res);
+      var bs = D.fakturaer.map(function (f) { return k.beslutninger[f.bilag]; });
+      var endret = D.fakturaer.filter(function (f, i) { var x = k.beslutninger[f.bilag]; return x.valg !== 'avvis' && k.forslag[i].konto && x.konto !== k.forslag[i].konto; }).length;
+      var avvist = bs.filter(function (x) { return x.valg === 'avvis'; }).length;
+      var endeligRiktig = D.fakturaer.filter(function (f) { var x = k.beslutninger[f.bilag]; return x.valg !== 'avvis' && x.konto === f.fasit; }).length;
+      h = '<div class="kort"><div class="kort-hode"><h2>Evaluering mot fasit</h2><button class="knapp sekundaer liten" id="vis-fasit" data-rolle="vis-fasit">' + (k.visFasit ? 'Skjul fasit' : 'Vis fasit per faktura') + '</button></div>' +
+        '<dl class="tallrekke"><div><dt>Forslag riktig (topp 1)</dt><dd>' + o.topp1 + ' / ' + o.n + '</dd></div><div><dt>Riktig blant topp 3</dt><dd>' + o.topp3 + ' / ' + o.n + '</dd></div>' +
+        '<div><dt>Enkel regel</dt><dd>' + o.baseline + ' / ' + o.n + '</dd></div>' +
+        '<div><dt>Endret av deg</dt><dd>' + endret + '</dd></div><div><dt>Sendt tilbake</dt><dd>' + avvist + '</dd></div><div><dt>Endelig konto riktig</dt><dd>' + endeligRiktig + ' / ' + (n - avvist) + '</dd></div></dl>' +
+        bandTabell(o.band) + '<p class="dempet liten-tekst">«Enkel regel» er kontoen leverandøren oftest er ført på. Med 16 fakturaer er tallene bare en illustrasjon. Treffsikkerhet må måles i PoC-en på flere hundre anonymiserte bilag før dere trekker konklusjoner.</p></div>';
+    }
+    $('k-eval').innerHTML = h;
+  }
+
+  function renderKLoo() {
+    var k = state.k;
+    var bom = k.loo ? k.loo.detaljer.filter(function (d) { return d.forslag !== d.fasit; }) : [];
+    $('k-loo').innerHTML = '<div class="kort"><div class="kort-hode"><h2>Offline-evaluering på historikken</h2><button class="knapp sekundaer liten" id="kjor-loo" data-rolle="kjor-loo">' + (k.loo ? 'Kjør på nytt' : 'Kjør evaluering') + '</button></div>' +
+      '<p>Hvert av de ' + D.historikk.length + ' historiske bilagene vurderes som om det var nytt, med resten av historikken som grunnlag (leave-one-out), og sammenlignes med den enkle regelen «hyppigste konto for leverandøren».</p>' +
+      '<p class="dempet liten-tekst">Historikken i demoen er syntetisk og laget fra 21 tekstmønstre hos 10 leverandører, så nesten alle bilag har nær like søsken. Tallene viser at mekanikken virker, ikke forventet treffsikkerhet. I PoC-en måles treffsikkerhet tidsbasert (lær på tidligere måneder, test på senere) og mot en enkel regel.</p>' +
+      (k.loo ? '<dl class="tallrekke"><div><dt>Bilag</dt><dd>' + k.loo.n + '</dd></div><div><dt>Topp 1 riktig</dt><dd>' + k.loo.topp1 + ' (' + Math.round(k.loo.topp1 / k.loo.n * 100) + ' %)</dd></div><div><dt>Topp 3 riktig</dt><dd>' + k.loo.topp3 + ' (' + Math.round(k.loo.topp3 / k.loo.n * 100) + ' %)</dd></div>' +
+        '<div><dt>Enkel regel</dt><dd>' + k.loo.baseline + ' (' + Math.round(k.loo.baseline / k.loo.n * 100) + ' %)</dd></div></dl>' +
+        bandTabell(k.loo.band) +
+        (bom.length ? '<h3>Bom</h3><ul class="mangler">' + bom.map(function (d) {
+          var hh = D.historikk.find(function (x) { return x.bilag === d.bilag; });
+          return '<li><span class="mono">' + d.bilag + '</span> «' + esc(hh.tekst) + '» fra ' + esc(hh.leverandor) + ': fasit ' + d.fasit + ', forslag ' + (d.forslag || 'ingen') + ' (konfidens ' + komma(d.konf) + ')</li>';
+        }).join('') + '</ul>' : '') : '') + '</div>';
+  }
+
+  function renderKontering() {
+    $('k-intro').innerHTML = '<div class="kort"><div class="kort-hode"><h2>Konteringsforslag for nye fakturaer</h2><div class="rad"><button class="knapp sekundaer liten" id="knullstill" data-rolle="knullstill">Nullstill</button></div></div>' +
+      '<p>Fakturaene er et syntetisk uttrekk som ligner en eksport fra Eyeshare. Forslagene bygger på ' + D.historikk.length + ' tidligere godkjente konteringer, enkle konteringsregler og likhet med tidligere bilag. Ingenting sendes tilbake til Eyeshare. I PoC-en brukes vurderingene til å måle treffsikkerhet.</p></div>';
+    renderKStatus();
+    $('k-tabell').innerHTML = '<div class="kort"><div class="rull"><table><thead><tr><th>Bilag</th><th>Leverandør og tekst</th><th class="h">Beløp NOK</th><th>Forslag, konfidens og avvik</th><th>Beslutning</th>' + (state.k.visFasit ? '<th>Fasit</th>' : '') + '</tr></thead><tbody>' +
+      D.fakturaer.map(kRadHtml).join('') + '</tbody></table></div></div>';
+    renderKEval(); renderKLoo();
+  }
+
+  function oppdaterKRad(i, fokusId) {
+    var gml = $('krad-' + i);
+    if (gml) {
+      var aapen = !!gml.querySelector('details[open]');
+      var tmp = document.createElement('tbody'); tmp.innerHTML = kRadHtml(D.fakturaer[i], i);
+      var ny = tmp.firstChild; gml.replaceWith(ny);
+      var dt = aapen && ny.querySelector('details'); if (dt) dt.open = true;
+    }
+    renderKStatus(); renderKEval();
+    medFokus(fokusId);
+    var st = $('krad-' + i).querySelector('.status');
+    var feil = state.k.feil[D.fakturaer[i].bilag];
+    kunngjor(D.fakturaer[i].bilag + ': ' + (feil || (st ? st.textContent : '')));
+  }
+
+  // ---------- Logg ----------
+  function renderLogg() {
+    var st = Logg.status;
+    var h = '<div class="kort"><div class="kort-hode"><h2>Revisjonslogg</h2><span class="dempet">' + flertall(Logg.poster.length, 'hendelse', 'hendelser') + ' i denne økten</span></div>' +
+      '<p>Hver hendelse inneholder SHA-256 av forrige hendelse. Endres en hendelse i ettertid, brytes kjeden fra og med den. I produksjon lagres loggen sentralt og skrivebeskyttet; hash-kjeden avdekker endringer, men hindrer dem ikke.</p>' +
+      '<div class="logghode"><button class="knapp" id="verifiser" data-rolle="verifiser">Kontroller kjeden</button>' +
+      (Logg.manipulert ? '<button class="knapp sekundaer" id="gjenopprett" data-rolle="gjenopprett">Gjenopprett hendelsen</button>' : '<button class="knapp sekundaer" id="manipuler" data-rolle="manipuler"' + (Logg.poster.length < 2 ? ' disabled' : '') + '>Simuler endring i ettertid</button>') +
+      '<span class="kjede ' + (st ? (st.ok ? 'ok' : 'brudd') : '') + '" role="status">' + (st ? (st.ok ? 'Kjeden er intakt.' : 'Brudd i kjeden ved hendelse #' + st.seq + '.') : '') + '</span></div></div>';
+    h += '<div class="rull"><table><thead><tr><th class="h">#</th><th>Tid (UTC)</th><th>Hendelse</th><th>Innhold</th><th>Hash</th></tr></thead><tbody>' +
+      Logg.poster.slice().reverse().map(function (p) {
+        var d = JSON.stringify(p.data);
+        return '<tr class="' + (st && !st.ok && p.seq === st.seq ? 'brudd' : '') + '"><td class="h tall">' + p.seq + '</td><td class="mono">' + esc(p.tid.replace('T', ' ').replace('Z', '')) + '</td><td>' + esc(p.hendelse) + '</td>' +
+          '<td class="mono" style="max-width:44rem;overflow-wrap:anywhere">' + esc(d.length > 260 ? d.slice(0, 260) + '…' : d) + '</td><td class="mono">' + esc(p.hash.slice(0, 12)) + '…</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    var fokus = document.activeElement && document.activeElement.id;
+    $('logg').innerHTML = h;
+    medFokus(fokus);
+  }
+
+  function oppdaterTellere() {
+    var t = function (id, tekst, hjelp) { $(id).innerHTML = '<span class="skjult-for-skjerm">, </span>' + esc(tekst) + (hjelp ? '<span class="skjult-for-skjerm"> ' + esc(hjelp) + '</span>' : ''); };
+    if (state.run) {
+      var akt = M.alleLinjer(state.run).filter(function (l) { return !l.utenfor; });
+      t('teller-budsjett', akt.filter(function (l) { return state.run.beslutninger[l.id]; }).length + '/' + akt.length, 'vurdert');
+    }
+    t('teller-kontering', Object.keys(state.k.beslutninger).length + '/' + D.fakturaer.length, 'vurdert');
+    t('teller-logg', String(Logg.poster.length), 'hendelser');
+  }
+
+  // ---------- Hendelser: budsjett ----------
+  var B = $('budsjett');
+  B.addEventListener('input', function (e) {
+    var t = e.target, l = t.dataset.linje && finnLinje(t.dataset.linje);
+    if (l && t.dataset.rolle === 'kommentar') utkast(l).kommentar = t.value;
+    if (t.dataset.rolle === 'kvittering-tekst') state.kvUtkast[t.dataset.nokkel] = t.value;
+  });
+  B.addEventListener('keydown', function (e) {
+    var t = e.target;
+    if (e.key === 'Enter' && t.dataset.rolle === 'kvittering-tekst') { e.preventDefault(); $(t.id + '-knapp').click(); }
+  });
+  /** Kvitterer (eller angrer) et høy-flagg med kommentar, logger det og tegner avvik og godkjenning på nytt. */
+  function kvitterFlagg(nokkel, angre) {
+    var id = 'kv-' + nokkel.replace(/[^A-Za-z0-9]/g, '-');
+    var kommentar = angre ? '' : (state.kvUtkast[nokkel] || '').trim();
+    if (!angre && !kommentar) { state.kvFeil[nokkel] = 'Skriv en kommentar for å kvittere.'; renderAvvik(); medFokus(id); return; }
+    var r = motor.kvitter(state.run, nokkel, kommentar);
+    if (r.feil) { state.kvFeil[nokkel] = r.feil; renderAvvik(); medFokus(id); return; }
+    delete state.kvFeil[nokkel];
+    if (r.endret) {
+      var k = r.kvittering, kv = state.run.kvitteringer[nokkel];
+      Logg.skriv('kvittering', { kjoring: state.run.id, flagg: nokkel, kode: k.kode, hvor: k.hvor, tekst: k.tekst, kvittert: !!kv, kommentar: kv ? kv.kommentar : '' });
+      if (state.eksport) state.eksport.utdatert = true;
+      state.bekreft = false;
+    }
+    if (angre) state.kvUtkast[nokkel] = '';
+    renderStatus(); renderAvvik(); renderAvslutning();
+    medFokus(angre ? id : id + '-angre');
+    kunngjor(angre ? 'Kvitteringen er angret.' : 'Avviket er kvittert.');
+  }
+  B.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.id === 'opplasting') { lesOpplasting(t.files); t.value = ''; return; }
+    var l = t.dataset.linje && finnLinje(t.dataset.linje);
+    if (!l) return;
+    if (t.dataset.rolle === 'konto') {
+      utkast(l).konto = t.value;
+      var knapp = $('e-' + l.id);
+      if (knapp) knapp.disabled = !t.value;
+      var bb = state.run.beslutninger[l.id], h = $('h-' + l.id);
+      if (h) h.hidden = !(bb && bb.valg !== 'avvis' && t.value && t.value !== bb.konto);
+    } else if (t.dataset.rolle === 'kommentar') {
+      var b = state.run.beslutninger[l.id];
+      utkast(l).kommentar = t.value;
+      if (b && b.valg) motor.vurder(state.run, l, b.valg, b.konto || '', t.value).endret && Logg.skriv('kommentar', { kjoring: state.run.id, linje: l.id, kommentar: t.value.trim() });
+    }
+  });
+  B.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-rolle]');
+    if (!t || t.disabled) return;
+    var rolle = t.dataset.rolle, l = t.dataset.linje && finnLinje(t.dataset.linje);
+    if (rolle === 'godta' || rolle === 'endre' || rolle === 'utelat') {
+      beslutt(l, rolle === 'utelat' ? 'avvis' : rolle);
+      oppdaterRad(l, t.id);
+    } else if (rolle === 'angre') { beslutt(l, ''); oppdaterRad(l, 'g-' + l.id); if (!$('g-' + l.id) || $('g-' + l.id).disabled) { medFokus('e-' + l.id) || medFokus('q-' + l.id) || medFokus('k-' + l.id); } }
+    else if (rolle === 'kvitter') { beslutt(l, 'utenfor'); oppdaterRad(l, 'a-' + l.id); }
+    else if (rolle === 'kvitter-flagg') kvitterFlagg(t.dataset.nokkel, false);
+    else if (rolle === 'angre-flagg') kvitterFlagg(t.dataset.nokkel, true);
+    else if (rolle === 'kilde') aapneKilde(0, t.dataset.linje);
+    else if (rolle === 'vis-kilde') aapneKilde(Number(t.dataset.fil || 0), null, t.dataset.ark || null);
+    else if (rolle === 'last-opp') $('opplasting').click();
+    else if (rolle === 'gaa-til') {
+      var rad = $('rad-' + t.dataset.linje);
+      if (rad) {
+        rad.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+        rad.classList.remove('blink'); void rad.offsetWidth; rad.classList.add('blink');
+        rad.focus({ preventScroll: true });
+      }
+    } else if (rolle === 'godta-sikre') {
+      M.alleLinjer(state.run).filter(function (x) { return erSikker(x) && !state.run.beslutninger[x.id]; }).forEach(function (x) { beslutt(x, 'godta', 'Godtatt med «Godta sikre linjer»'); oppdaterRad(x); });
+      if (!medFokus('godkjenn')) {
+        var neste = M.alleLinjer(state.run).find(function (x) { return !x.utenfor && !state.run.beslutninger[x.id]; });
+        if (!(neste && medFokus('k-' + neste.id))) medFokus('godkjenning-tittel');
+      }
+      kunngjor('Sikre linjer er godtatt.');
+    } else if (rolle === 'godkjenn') { state.bekreft = true; renderAvslutning(); medFokus('bekreft-eksport'); }
+    else if (rolle === 'avbryt-eksport') { state.bekreft = false; renderAvslutning(); medFokus('godkjenn'); }
+    else if (rolle === 'bekreft-eksport') {
+      var mangler = uiMangler();
+      if (mangler.length) { state.bekreft = false; renderAvslutning(); medFokus('godkjenning-tittel'); return; }
+      try {
+        var x = M.byggEksport(state.run);
+        M.sha256(x.tekst).then(function (sha) {
+          state.eksport = { filnavn: x.filnavn, tekst: x.tekst, rader: x.rader, sum: x.sum, sha: sha, utdatert: false };
+          state.run.eksport = { filnavn: x.filnavn, sha256: sha };
+          state.bekreft = false; state.kopiFallback = false;
+          Logg.skriv('eksport', { kjoring: state.run.id, filnavn: x.filnavn, sha256: sha, rader: x.rader, avstemming: x.avstemming });
+          renderStatus(); renderAvslutning();
+          var k = $('importfil'); if (k) { k.scrollIntoView({ block: 'start' }); k.focus({ preventScroll: true }); }
+        });
+      } catch (err) { state.bekreft = false; state.melding = { type: 'feil', tekst: err.message }; renderFiler(); renderAvslutning(); }
+    } else if (rolle === 'kopier') {
+      var tekst = state.eksport.tekst;
+      var ok = function () { $('kopistatus').textContent = 'Kopiert.'; };
+      var fallback = function () { state.kopiFallback = true; renderAvslutning(); var f = $('kopifelt'); if (f) { f.focus(); f.select(); } $('kopistatus').textContent = 'Merk teksten og kopier med tastaturet.'; };
+      try { navigator.clipboard.writeText(tekst).then(ok, fallback); } catch (err) { fallback(); }
+    } else if (rolle === 'nullstill' || rolle === 'tilbake-demo') { nyKjoring(D.budsjettfiler, 'demo'); renderBudsjett(); medFokus(rolle === 'nullstill' ? 'nullstill' : 'last-opp'); kunngjor('Demoarkene er lest inn på nytt.'); }
+  });
+
+  // ---------- Hendelser: kontering ----------
+  var K = $('kontering');
+  K.addEventListener('input', function (e) {
+    var t = e.target, i = Number(t.dataset.k);
+    if (!isNaN(i) && t.dataset.rolle === 'kkommentar') kUtkast(i).kommentar = t.value;
+  });
+  K.addEventListener('change', function (e) {
+    var t = e.target, i = Number(t.dataset.k);
+    if (isNaN(i)) return;
+    var u = kUtkast(i), bil = D.fakturaer[i].bilag, b = state.k.beslutninger[bil];
+    if (t.dataset.rolle === 'kkonto' || t.dataset.rolle === 'kks') {
+      if (t.dataset.rolle === 'kkonto') u.konto = t.value; else u.ks = t.value;
+      var kh = $('kh-' + i);
+      if (kh) kh.hidden = !(b && b.valg !== 'avvis' && (u.konto !== b.konto || u.ks !== b.kostnadssted));
+    }
+    else if (t.dataset.rolle === 'kkommentar') {
+      u.kommentar = t.value;
+      if (b && b.kommentar !== t.value.trim()) { b.kommentar = t.value.trim(); Logg.skriv('kommentar', { bilag: bil, kommentar: b.kommentar }); }
+    }
+  });
+  K.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-rolle]');
+    if (!t || t.disabled) return;
+    var i = Number(t.dataset.k), rolle = t.dataset.rolle;
+    if (rolle === 'kgodta' || rolle === 'kvelg' || rolle === 'kavvis') {
+      kBeslutt(i, { kgodta: 'godta', kvelg: 'velg', kavvis: 'avvis' }[rolle]);
+      oppdaterKRad(i, t.id);
+    } else if (rolle === 'kangre') { kBeslutt(i, ''); oppdaterKRad(i, 'kv-' + i); }
+    else if (rolle === 'vis-fasit') { state.k.visFasit = !state.k.visFasit; renderKontering(); medFokus('vis-fasit'); }
+    else if (rolle === 'kjor-loo') {
+      state.k.loo = kont.evaluer(D.historikk);
+      Logg.skriv('offline-evaluering', { bilag: state.k.loo.n, topp1: state.k.loo.topp1, topp3: state.k.loo.topp3, enkel_regel: state.k.loo.baseline });
+      renderKLoo(); medFokus('kjor-loo');
+    } else if (rolle === 'knullstill') { nyKontering(); renderKontering(); medFokus('knullstill'); kunngjor('Vurderingene er nullstilt.'); }
+  });
+
+  // ---------- Hendelser: logg og kildevindu ----------
+  $('logg').addEventListener('click', function (e) {
+    var t = e.target.closest('[data-rolle]');
+    if (!t || t.disabled) return;
+    if (t.dataset.rolle === 'verifiser') Logg.verifiser().then(function (r) { Logg.status = r; renderLogg(); });
+    else if (t.dataset.rolle === 'manipuler') {
+      var p = Logg.poster.find(function (x) { return x.hendelse === 'beslutning' || x.hendelse === 'kontering'; }) || Logg.poster[0];
+      Logg.manipulert = { seq: p.seq, data: p.data };
+      var kopi = JSON.parse(JSON.stringify(p.data));
+      if (kopi.valg) kopi.valg = kopi.valg === 'godta' ? 'avvis' : 'godta'; else kopi.endret_i_ettertid = true;
+      p.data = kopi;
+      Logg.verifiser().then(function (r) { Logg.status = r; renderLogg(); medFokus('gjenopprett'); });
+    } else if (t.dataset.rolle === 'gjenopprett') {
+      var q = Logg.poster.find(function (x) { return x.seq === Logg.manipulert.seq; });
+      q.data = Logg.manipulert.data; Logg.manipulert = null;
+      Logg.verifiser().then(function (r) { Logg.status = r; renderLogg(); medFokus('manipuler'); });
+    }
+  });
+  $('lukk-kilde').addEventListener('click', function () { $('kildevindu').close(); });
+  $('kildefaner').addEventListener('click', function (e) {
+    var t = e.target.closest('[data-kfil]');
+    if (t) { state.kilde.fil = Number(t.dataset.kfil); renderKilde(); medFokus(null); var b = $('kildefaner').querySelector('[data-kfil="' + state.kilde.fil + '"]'); if (b) b.focus(); }
+  });
+
+  // ---------- Faner ----------
+  var FANER = ['budsjett', 'kontering', 'logg', 'om'];
+  function velgFane(id, fokus) {
+    if (FANER.indexOf(id) < 0) id = 'budsjett';
+    state.fane = id;
+    FANER.forEach(function (f) {
+      $(f).hidden = f !== id;
+      var b = $('fane-' + f);
+      b.setAttribute('aria-selected', f === id ? 'true' : 'false');
+      b.tabIndex = f === id ? 0 : -1;
+    });
+    if (id === 'logg') renderLogg();
+    if (fokus) $('fane-' + id).focus();
+    try { history.replaceState(null, '', '#' + id); } catch (e) { /* ikke kritisk */ }
+  }
+  var liste = document.querySelector('[role="tablist"]');
+  liste.addEventListener('click', function (e) { var b = e.target.closest('[role="tab"]'); if (b) velgFane(b.id.replace('fane-', '')); });
+  liste.addEventListener('keydown', function (e) {
+    var i = FANER.indexOf(state.fane);
+    if (e.key === 'ArrowRight') { velgFane(FANER[(i + 1) % FANER.length], true); e.preventDefault(); }
+    if (e.key === 'ArrowLeft') { velgFane(FANER[(i + FANER.length - 1) % FANER.length], true); e.preventDefault(); }
+    if (e.key === 'Home') { velgFane(FANER[0], true); e.preventDefault(); }
+    if (e.key === 'End') { velgFane(FANER[FANER.length - 1], true); e.preventDefault(); }
+  });
+
+  // ---------- Start ----------
+  nyKjoring(D.budsjettfiler, 'demo');
+  nyKontering();
+  renderBudsjett();
+  renderKontering();
+  velgFane((location.hash || '').replace('#', '') || 'budsjett');
+})();
+</script>
